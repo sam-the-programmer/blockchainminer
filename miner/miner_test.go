@@ -13,5 +13,5 @@ Gerald->Mary->14
 Angela->Axel->120
 `+b.SHA256("prev_block"), 6)
 
-	miner.Mine(500000, 20, true, true)
+	miner.Mine(500000, 20, true)
 }

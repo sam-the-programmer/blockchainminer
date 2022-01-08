@@ -18,7 +18,7 @@ func SHA256(s string) string {
 }
 
 // Mine returns the nonce value that works.
-func (m *Miner) Mine(iterations int, threads int, hashTwice bool, output bool) int {
+func (m *Miner) Mine(iterations int, threads int, output bool) int {
 	var hashed string
 
 	solutions := make(chan []int, 100)
@@ -37,11 +37,8 @@ func (m *Miner) Mine(iterations int, threads int, hashTwice bool, output bool) i
 			nonce := start
 
 			for i := 0; i < iterations; i++ {
-				if hashTwice {
-					hashed = SHA256(SHA256(m.transactionString + strconv.Itoa(nonce+i)))
-				} else {
-					hashed = SHA256(m.transactionString + strconv.Itoa(nonce+i))
-				}
+				hashed = SHA256(SHA256(m.transactionString + strconv.Itoa(nonce+i)))
+
 
 				if hashed[:m.Difficulty] == strings.Repeat("0", m.Difficulty) {
 					c <- []int{nonce + i, t}
