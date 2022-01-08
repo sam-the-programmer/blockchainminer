@@ -1,3 +1,3 @@
 # Bitcoin Miner
 
-A bitcoin miner framework implemented in Go.
+A simple, concurrent, bitcoin miner framework implemented in Go.

@@ -23,7 +23,7 @@ func (m *Miner) Mine(iterations int, threads int, hashTwice bool, output bool) i
 
 	solutions := make(chan []int, 100)
 
-	fmt.Println("Preparing to test", threads*iterations, "nonce values to find a difficulty of", m.Difficulty, "\b.")
+	fmt.Println("Preparing to test", threads*iterations, "nonce values to find a difficulty of", m.Difficulty)
 
 	// For Concurrency
 	for t := 0; t < threads; t++ {
