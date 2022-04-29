@@ -7,14 +7,14 @@ A simple, concurrent bitcoin miner framework implemented in Go.
 ## Installation
 
 ```shell
-go get github.com/password-classified/bitcoinminer
+go get github.com/sam-the-programmer/bitcoinminer
 ```
 
 Then, import it with...
 
 ```go
 import (
-	m "github.com/password-classified/bitcoinminer/miner"
+	m "github.com/sam-the-programmer/bitcoinminer/miner"
 )
 ```
 
@@ -53,7 +53,7 @@ To conclude, here is an example script...
 package main
 
 import (
-	m "github.com/password-classified/bitcoinminer/miner"
+	m "github.com/sam-the-programmer/bitcoinminer/miner"
 )
 
 func main() {
