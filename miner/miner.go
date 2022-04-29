@@ -1,20 +1,34 @@
 package miner
 
 import (
-	sha "crypto/sha256"
 	"fmt"
 	"strconv"
 	"strings"
 )
 
+// HashFunction is a function that returns a hashed version of a string
+type HashFunction func(string) string
+
+// Miner is a struct of the mining code.
 type Miner struct {
-	transactionString string
-	Difficulty        int
+	Difficulty int
+	HashTimes  uint
+
+	transaction   string
+	hashFunc      func(string) string
+	multiHashFunc func(string) string
 }
 
-// SHA256 returns the Sha256 of as string as a string
-func SHA256(s string) string {
-	return fmt.Sprintf("%x", sha.Sum256([]byte(s)))
+func (m *Miner) SetHashTimes(t uint) {
+	m.HashTimes = t
+
+	m.multiHashFunc = func(s string) string {
+		hash := m.hashFunc(s)
+		for i := uint(0); i < m.HashTimes-1; i++ {
+			hash = m.hashFunc(hash)
+		}
+		return hash
+	}
 }
 
 // Mine returns the nonce value that works.
@@ -37,8 +51,7 @@ func (m *Miner) Mine(iterations int, threads int, output bool) int {
 			nonce := start
 
 			for i := 0; i < iterations; i++ {
-				hashed = SHA256(SHA256(m.transactionString + strconv.Itoa(nonce+i)))
-
+				hashed = m.multiHashFunc(m.transaction + strconv.Itoa(nonce+i))
 
 				if hashed[:m.Difficulty] == strings.Repeat("0", m.Difficulty) {
 					c <- []int{nonce + i, t}
@@ -56,9 +69,10 @@ func (m *Miner) Mine(iterations int, threads int, output bool) int {
 	return n[0]
 }
 
-func NewMiner(transaction string, difficulty int) Miner {
+func NewMiner(transaction string, difficulty int, hash HashFunction) Miner {
 	return Miner{
-		transactionString: transaction,
-		Difficulty:        difficulty,
+		transaction: transaction,
+		Difficulty:  difficulty,
+		hashFunc:    hash,
 	}
 }

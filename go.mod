@@ -1,3 +1,3 @@
-module github.com/password-classified/bitcoinminer
+module github.com/sam-the-programmer/bitcoinminer
 
-go 1.17
+go 1.18
