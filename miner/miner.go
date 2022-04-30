@@ -2,24 +2,73 @@ package miner
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
+
+	h "github.com/sam-the-programmer/bitcoinminer/hash"
 )
 
-// HashFunction is a function that returns a hashed version of a string
-type HashFunction func(string) string
+// CPUMiner is a struct of a CPU coin miner.
+type CPUMiner struct {
+	Difficulty  uint   // The difficulty for the miner. Defaults to 1.
+	HashTimes   uint   // The number of times to hash the value. Defaults to 1.
+	Workers     uint64 // The number of threads to use for mining. Defaults to 1.
+	SearchSize  uint64 // The number of nonces to search through. Defaults to 1000000000.
+	OutputLevel uint8  // The level of output to give. Defaults to 0. 0 means nothing, 1 or above incrementally increases it. Do not set manually, use th Miner.SetOutputLevel method.
 
-// Miner is a struct of the mining code.
-type Miner struct {
-	Difficulty int
-	HashTimes  uint
+	transaction   string         // The transaction to go through the hashing process.
+	hashFunc      h.HashFunction // The hash function to use.
+	multiHashFunc h.HashFunction // The function to use for hashing multiple times.
 
-	transaction   string
-	hashFunc      func(string) string
-	multiHashFunc func(string) string
+	solutionChan    chan uint64 // The channel to send the nonce to.
+	hasNotFoundChan chan bool   // The channel to tell if it has not been solved.
+
+	solutionString string // The string to compare the hash to.
+
+	threadOutputFunc   func(uint64, uint64)
+	solutionOutputFunc func(uint64, bool)
 }
 
-func (m *Miner) SetHashTimes(t uint) {
+// SetDifficulty sets the difficulty for the miner.
+func (m *CPUMiner) SetDifficulty(t uint) {
+	m.Difficulty = t
+	m.solutionString = strings.Repeat("0", int(t))
+}
+
+// SetOutputLevel sets the level of output to give during mining.
+// 0 means nothing
+// 1 or above incrementally increases output (max 1).
+func (m *CPUMiner) SetOutputLevel(l int) {
+	m.OutputLevel = uint8(l)
+	switch l {
+	case 0:
+		m.threadOutputFunc = func(uint64, uint64) {}
+		m.solutionOutputFunc = func(uint64, bool) {}
+	default:
+		m.threadOutputFunc = func(a uint64, b uint64) { fmt.Println("Thread\t", a, " searching\t", b, "\tvalues.") }
+		m.solutionOutputFunc = func(value uint64, found bool) {
+			if found {
+				fmt.Println("Found solution value of ", value, ".")
+			} else {
+				fmt.Println("No nonce found after ", value, " iterations.")
+			}
+		}
+	}
+}
+
+// SetSearchSize sets the number of nonces to search through.
+func (m *CPUMiner) SetSearchSize(size uint64) {
+	m.SearchSize = size
+}
+
+// SetWorkers sets the number of threads to use for mining.
+func (m *CPUMiner) SetWorkers(workers uint64) {
+	m.Workers = workers
+	m.solutionChan = make(chan uint64, workers)
+	m.hasNotFoundChan = make(chan bool, workers)
+}
+
+// SetMultiHashFunc sets the number of times to hash the value.
+func (m *CPUMiner) SetHashTimes(t uint) {
 	m.HashTimes = t
 
 	m.multiHashFunc = func(s string) string {
@@ -31,48 +80,89 @@ func (m *Miner) SetHashTimes(t uint) {
 	}
 }
 
-// Mine returns the nonce value that works.
-func (m *Miner) Mine(iterations int, threads int, output bool) int {
-	var hashed string
-
-	solutions := make(chan []int, 100)
-
-	fmt.Println("Preparing to test", threads*iterations, "nonce values to find a difficulty of", m.Difficulty)
-
-	// For Concurrency
-	for t := 0; t < threads; t++ {
-		if output {
-			fmt.Println("Thread", t, "\b: starting search at", t*iterations, "until", t*iterations+iterations)
-		}
-
-		// Mining
-		go func(start int, c chan<- []int, t int) {
-
-			nonce := start
-
-			for i := 0; i < iterations; i++ {
-				hashed = m.multiHashFunc(m.transaction + strconv.Itoa(nonce+i))
-
-				if hashed[:m.Difficulty] == strings.Repeat("0", m.Difficulty) {
-					c <- []int{nonce + i, t}
-					break
-				}
-			}
-		}(t*iterations, solutions, t) // So that it can scan many integers simultaneously, but still not miss any
-	}
-
-	fmt.Println("All", threads, "threads have been created. Searching for values.")
-
-	n := <-solutions
-	fmt.Println("Successful trial in thread", n[1], "with nonce value =", n[0])
-
-	return n[0]
+// SetHashFunc sets hash function for mining.
+func (m *CPUMiner) SetHash(f h.HashFunction) {
+	m.hashFunc = f
+	m.SetHashTimes(m.HashTimes)
 }
 
-func NewMiner(transaction string, difficulty int, hash HashFunction) Miner {
-	return Miner{
-		transaction: transaction,
-		Difficulty:  difficulty,
-		hashFunc:    hash,
+// MineForever returns the nonce value for a mined block,
+// but will search forever single-threadedly, never stopping.
+func (m *CPUMiner) MineForever() uint64 {
+	nonce := uint64(0)
+	for {
+		hash := m.multiHashFunc(fmt.Sprintf(m.transaction, nonce))
+		if m.isValidHash(hash) {
+			break
+		}
+		nonce++
+	}
+
+	m.solutionOutputFunc(nonce, true)
+	return nonce
+}
+
+// ThreadedMine mines the block with the given difficulty,
+// using multiple threads.
+func (m *CPUMiner) ThreadedMine() (uint64, bool) {
+	noncesPerWorker := uint64(m.SearchSize / uint64(m.Workers))
+	for i := uint64(0); i < m.Workers; i++ {
+		go m.mineThread(i*noncesPerWorker, noncesPerWorker)
+		m.threadOutputFunc(i, noncesPerWorker)
+	}
+
+	workersDone := uint64(0)
+	for {
+		select {
+		case nonce := <-m.solutionChan:
+			m.solutionOutputFunc(nonce, true)
+			return nonce, true
+		case <-m.hasNotFoundChan:
+			workersDone++
+			if workersDone >= m.Workers {
+				m.solutionOutputFunc(workersDone*noncesPerWorker, false)
+				return 0, false
+			}
+		}
+	}
+}
+
+// isValidHash returns true if the hash is valid given the
+// miner's difficulty.
+func (m *CPUMiner) isValidHash(hash string) bool {
+	return m.solutionString == hash[:m.Difficulty]
+}
+
+// mineThread mines the block with the given difficulty,
+// for the number of nonces stated. It can be used as a
+// goroutine.
+func (m *CPUMiner) mineThread(start uint64, num uint64) {
+	for i := start; i < num; i++ {
+		hash := m.multiHashFunc(fmt.Sprintf(m.transaction, i))
+		if m.isValidHash(hash) {
+			m.solutionChan <- i
+		}
+	}
+
+	m.hasNotFoundChan <- true
+}
+
+// NewMiner creates a new miner struct, calling initialisation code.
+func NewMiner(transaction string, hash h.HashFunction, workers uint64) CPUMiner {
+	return CPUMiner{
+		Difficulty:  1,
+		HashTimes:   1,
+		Workers:     workers,
+		SearchSize:  1000000000,
+		OutputLevel: 0,
+
+		transaction:   transaction,
+		hashFunc:      hash,
+		multiHashFunc: func(s string) string { return hash(s) },
+
+		solutionChan:    make(chan uint64, workers),
+		hasNotFoundChan: make(chan bool, workers),
+
+		solutionString: strings.Repeat("0", 1),
 	}
 }
