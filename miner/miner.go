@@ -15,9 +15,9 @@ type CPUMiner struct {
 	SearchSize  uint64 // The number of nonces to search through. Defaults to 1000000000.
 	OutputLevel uint8  // The level of output to give. Defaults to 0. 0 means nothing, 1 or above incrementally increases it. Do not set manually, use th Miner.SetOutputLevel method.
 
-	transaction   string         // The transaction to go through the hashing process.
-	hashFunc      h.HashFunction // The hash function to use.
-	multiHashFunc h.HashFunction // The function to use for hashing multiple times.
+	Transaction   string         // The transaction to go through the hashing process.
+	HashFunc      h.HashFunction // The hash function to use.
+	MultiHashFunc h.HashFunction // The function to use for hashing multiple times.
 
 	solutionChan    chan uint64 // The channel to send the nonce to.
 	hasNotFoundChan chan bool   // The channel to tell if it has not been solved.
@@ -35,7 +35,7 @@ func (m *CPUMiner) SetDifficulty(t uint) {
 }
 
 // SetOutputLevel sets the level of output to give during mining.
-// 0 means nothing
+// 0 means nothing,
 // 1 or above incrementally increases output (max 1).
 func (m *CPUMiner) SetOutputLevel(l int) {
 	m.OutputLevel = uint8(l)
@@ -44,7 +44,7 @@ func (m *CPUMiner) SetOutputLevel(l int) {
 		m.threadOutputFunc = func(uint64, uint64) {}
 		m.solutionOutputFunc = func(uint64, bool) {}
 	default:
-		m.threadOutputFunc = func(a uint64, b uint64) { fmt.Println("Thread\t", a, " searching\t", b, "\tvalues.") }
+		m.threadOutputFunc = func(a uint64, b uint64) { fmt.Println("Thread\t", a+1, " searching\t", b, "\tvalues.") }
 		m.solutionOutputFunc = func(value uint64, found bool) {
 			if found {
 				fmt.Println("Found solution value of ", value, ".")
@@ -70,19 +70,12 @@ func (m *CPUMiner) SetWorkers(workers uint64) {
 // SetMultiHashFunc sets the number of times to hash the value.
 func (m *CPUMiner) SetHashTimes(t uint) {
 	m.HashTimes = t
-
-	m.multiHashFunc = func(s string) string {
-		hash := m.hashFunc(s)
-		for i := uint(0); i < m.HashTimes-1; i++ {
-			hash = m.hashFunc(hash)
-		}
-		return hash
-	}
+	m.MultiHashFunc = h.MultiHash(m.HashFunc, t)
 }
 
 // SetHashFunc sets hash function for mining.
 func (m *CPUMiner) SetHash(f h.HashFunction) {
-	m.hashFunc = f
+	m.HashFunc = f
 	m.SetHashTimes(m.HashTimes)
 }
 
@@ -91,7 +84,7 @@ func (m *CPUMiner) SetHash(f h.HashFunction) {
 func (m *CPUMiner) MineForever() uint64 {
 	nonce := uint64(0)
 	for {
-		hash := m.multiHashFunc(fmt.Sprintf(m.transaction, nonce))
+		hash := m.MultiHashFunc(fmt.Sprintf(m.Transaction, nonce))
 		if m.isValidHash(hash) {
 			break
 		}
@@ -138,7 +131,7 @@ func (m *CPUMiner) isValidHash(hash string) bool {
 // goroutine.
 func (m *CPUMiner) mineThread(start uint64, num uint64) {
 	for i := start; i < num; i++ {
-		hash := m.multiHashFunc(fmt.Sprintf(m.transaction, i))
+		hash := m.MultiHashFunc(fmt.Sprintf(m.Transaction, i))
 		if m.isValidHash(hash) {
 			m.solutionChan <- i
 		}
@@ -148,7 +141,9 @@ func (m *CPUMiner) mineThread(start uint64, num uint64) {
 }
 
 // NewMiner creates a new miner struct, calling initialisation code.
-func NewMiner(transaction string, hash h.HashFunction, workers uint64) CPUMiner {
+func NewMiner(transaction string, hash h.HashFunction) CPUMiner {
+	workers := uint64(100)
+
 	return CPUMiner{
 		Difficulty:  1,
 		HashTimes:   1,
@@ -156,9 +151,9 @@ func NewMiner(transaction string, hash h.HashFunction, workers uint64) CPUMiner 
 		SearchSize:  1000000000,
 		OutputLevel: 0,
 
-		transaction:   transaction,
-		hashFunc:      hash,
-		multiHashFunc: func(s string) string { return hash(s) },
+		Transaction:   transaction,
+		HashFunc:      hash,
+		MultiHashFunc: func(s string) string { return hash(s) },
 
 		solutionChan:    make(chan uint64, workers),
 		hasNotFoundChan: make(chan bool, workers),
