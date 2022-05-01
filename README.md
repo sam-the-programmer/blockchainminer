@@ -22,47 +22,38 @@ import (
 
 ## Usage
 
-The function `miner.NewMiner` returns a miner struct that has the method `Mine`.
-
-Pass the transaction string to the first argument of `NewMiner`, and the difficulty (needed number of 0s at the start) as the second argument.
-
-```go
-miner := m.NewMiner(`[BLOCK NUMBER]
-[Transaction 1]
-[Transaction 2]
-[Transaction 3]
-[Transaction ...]
-`+m.SHA256("prev_block"), 6)
-```
-
-For mining, the syntax of the `Miner.Mine` method is as follows.
-
-```go
-miner.Mine(
-	iterations_per_thread, // An integer
-	threads, // An integer
-	verbose_output, // A boolean
-)
-```
-<br>
-
-### Examples
-To conclude, here is an example script...
+The bulk of the API is here. More detail is on [pkg.go.dev](https://pkg.go.dev/github.com/sam-the-programmer/bitcoinminer)
 
 ```go
 package main
 
 import (
-	m "github.com/sam-the-programmer/bitcoinminer/miner"
+	"fmt"
+
+	"github.com/sam-the-programmer/bitcoinminer/hash"
+	"github.com/sam-the-programmer/bitcoinminer/miner"
 )
 
 func main() {
-	miner := m.NewMiner(`123
-Bob->Steve->20
-Gerald->Mary->14
-Angela->Axel->120
-`+m.SHA256("prev_block_hash_here"), 6)
+	transactionString := "<BlockNum-0>\nAlice->Bob->20\nBob->Charlie->10\nCharlie->Alice->5\n[PrevBlockHash]\n%v"
+	m := miner.NewMiner(
+		transactionString,
+		hash.SHA256,
+		10000,
+	)
 
-	miner.Mine(500000, 3000, true)
+	m.SetSearchSize(100000000000)
+	m.SetDifficulty(6)
+	m.SetHashTimes(1)
+	m.SetOutputLevel(1)
+
+	solution, hasFound := m.ThreadedMine()
+	if hasFound {
+		fmt.Println("\n\n", solution, "\n", hash.SHA256(hash.SHA256(fmt.Sprintf(transactionString, solution))))
+	}
 }
+
 ```
+
+<br>
+
