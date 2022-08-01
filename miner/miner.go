@@ -1,3 +1,4 @@
+// CPU coin miners.
 package miner
 
 import (
