@@ -1,20 +1,20 @@
-# Bitcoin Miner
+# Blockchain Miner
 
-A simple, concurrent bitcoin miner framework implemented in Go.
+A simple, concurrent blockchain miner framework implemented in Go.
 
 > #### Disclaimer: this is not a product intended to be used for real mining, since I have little expertise on the topic. We do not take any responsibility or liability around any damage, financial loss or loss of any kind caused or in any way linked to this software. See the LICENSE file for more information.
 
 ## Installation
 
 ```shell
-go get github.com/sam-the-programmer/bitcoinminer
+go get github.com/sam-the-programmer/blockchainminer
 ```
 
 Then, import it with...
 
 ```go
 import (
-	m "github.com/sam-the-programmer/bitcoinminer/miner"
+	m "github.com/sam-the-programmer/blockchainminer/miner"
 )
 ```
 
@@ -22,7 +22,7 @@ import (
 
 ## Usage
 
-The bulk of the API is here. More detail is on [pkg.go.dev](https://pkg.go.dev/github.com/sam-the-programmer/bitcoinminer)
+The bulk of the API is here. More detail is on [pkg.go.dev](https://pkg.go.dev/github.com/sam-the-programmer/blockchainminer)
 
 ```go
 package main
@@ -30,8 +30,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/sam-the-programmer/bitcoinminer/hash"
-	"github.com/sam-the-programmer/bitcoinminer/miner"
+	"github.com/sam-the-programmer/blockchainminer/hash"
+	"github.com/sam-the-programmer/blockchainminer/miner"
 )
 
 func main() {
